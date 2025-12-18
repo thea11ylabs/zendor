@@ -33,7 +33,12 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Image src="/images/logo.png" alt="logo" />
+              <Image
+                src="/images/logo.png"
+                alt="logo"
+                width={100}
+                height={100}
+              />
             </div>
             <span className="font-bold text-xl text-white">Zendor</span>
           </div>
@@ -281,7 +286,12 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-gradient-to-br from-violet-500 to-purple-600 rounded flex items-center justify-center">
-              <Image src="/images/logo.png" alt="logo" />
+              <Image
+                src="/images/logo.png"
+                alt="logo"
+                width={100}
+                height={100}
+              />
             </div>
             <span className="font-semibold text-white">Zendor</span>
           </div>

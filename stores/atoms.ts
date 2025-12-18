@@ -41,14 +41,31 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     }
 ] as const
 
+// Session-based chat identification using standard sessionStorage
+const sessionStorageAdapter = typeof window === "undefined"
+    ? undefined
+    : createJSONStorage<string>(() => sessionStorage);
+
 export const sessionIdAtom = atomWithStorage<string>(
     "chat-session-id",
     nanoid(),
-    typeof window === "undefined"
-        ? undefined
-        : createJSONStorage(() => sessionStorage),
+    sessionStorageAdapter,
     { getOnInit: true }
 );
+
+// Chat thread mapping for session
+const sessionThreadsStorageAdapter = typeof window === "undefined"
+    ? undefined
+    : createJSONStorage<Record<string, Id<"chats">>>(() => sessionStorage);
+
+export const sessionChatThreadsAtom = atomWithStorage<Record<string, Id<"chats">>>(
+    "session-chat-threads",
+    {},
+    sessionThreadsStorageAdapter,
+    { getOnInit: true }
+);
+
+export const chatIdAtom = atom<Id<"chats"> | null>(null);
 
 export const selectedModelAtom = atom<ModelOption>(AVAILABLE_MODELS[0]);
 export const reasoningEffortAtom = atom<ReasoningEffort>("auto");
@@ -67,8 +84,6 @@ const shouldStreamBaseAtom = atomWithStorage<boolean>(
 );
 
 let shouldStreamSetCount = 0;
-
-export const chatIdAtom = atom<Id<"chats"> | null>(null);
 
 export const shouldStreamAtom = atom(
     (get) => get(shouldStreamBaseAtom),

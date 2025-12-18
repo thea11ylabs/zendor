@@ -10,6 +10,8 @@ import {
   reasoningEffortAtom,
   webSearchAtom,
   chatIdAtom,
+  sessionIdAtom,
+  sessionChatThreadsAtom,
 } from "../stores/atoms";
 
 interface SimpleChatPanelProps {
@@ -26,7 +28,9 @@ export function SimpleChatPanel({
   const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom);
   const [reasoningEffort, setReasoningEffort] = useAtom(reasoningEffortAtom);
   const [webSearch, setWebSearch] = useAtom(webSearchAtom);
-  const [chatId] = useAtom(chatIdAtom);
+  const [chatId, setChatId] = useAtom(chatIdAtom);
+  const [sessionId] = useAtom(sessionIdAtom);
+  const [sessionThreads, setSessionThreads] = useAtom(sessionChatThreadsAtom);
   const [inputValue, setInputValue] = useState("");
   const [displayValue, setDisplayValue] = useState("");
   const [thinkingSidebarOpen, setThinkingSidebarOpen] = useState(false);
@@ -45,6 +49,7 @@ export function SimpleChatPanel({
     messages,
     streamUrl,
     sendMessage,
+    createChatAndSend,
     stop,
     threadIsStreaming: isStreaming,
     isLoadingChatHistory,
@@ -134,20 +139,60 @@ export function SimpleChatPanel({
     setInputValue("");
     setDisplayValue("");
 
+    // If no active chat, create a new one and send message
     if (!chatId) {
-      return; // Need chatId to send message
+      const newChatId = await createChatAndSend(userMessage);
+      if (newChatId && sessionId) {
+        // Associate the new chat with the current session
+        setSessionThreads((prev) => ({
+          ...prev,
+          [sessionId]: newChatId,
+        }));
+      }
+    } else {
+      // Use existing chat
+      await sendMessage(userMessage);
     }
-
-    await sendMessage(userMessage);
   }, [
     inputValue,
     isStreaming,
     chatId,
+    sessionId,
     sendMessage,
+    createChatAndSend,
     showMacroDropdown,
     handleMacroSelect,
     documentContent,
+    setSessionThreads,
   ]);
+
+  // Initialize chatId from session on mount and handle expiry
+  useEffect(() => {
+    if (!chatId && sessionId && sessionThreads[sessionId]) {
+      // Check if session expired (8 hours)
+      const sessionData = sessionStorage.getItem(`chat-session-id`);
+      if (sessionData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          if (
+            parsed.timestamp &&
+            Date.now() - parsed.timestamp > 8 * 60 * 60 * 1000
+          ) {
+            // Session expired, clear session data
+            sessionStorage.removeItem(`chat-session-id`);
+            sessionStorage.removeItem(`session-chat-threads`);
+            setSessionThreads({});
+            return;
+          }
+        } catch {
+          // If parsing fails, continue with existing data
+        }
+      }
+
+      // Restore chatId from session
+      setChatId(sessionThreads[sessionId]);
+    }
+  }, [chatId, sessionId, sessionThreads, setChatId, setSessionThreads]);
 
   // Handle resize start
   const handleMouseDown = useCallback(() => {
