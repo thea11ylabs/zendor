@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(bun install)",
+      "Bash(bun add:*)",
+      "Bash(bunx:*)",
+      "Bash(bun run:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(bun lint:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:docs.excalidraw.com)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm run lint:*)",
+      "Bash(node -e \"const {languages} = require(''@codemirror/language-data''); console.log(languages.map(l => l.name).slice(0, 30).join('', ''))\")",
+      "Bash(echo:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(bun update:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
