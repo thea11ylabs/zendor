@@ -1,14 +1,20 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import { authComponent } from "./auth";
 
-// Get all chats ordered by updatedAt
+// Get all chats for the current user ordered by updatedAt
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
     const chats = await ctx.db
       .query("chats")
-      .withIndex("by_updated")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .paginate(args.paginationOpts);
 
@@ -33,11 +39,17 @@ export const create = mutation({
     title: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
     const now = Date.now();
     const chatId = await ctx.db.insert("chats", {
       title: args.title || "New chat",
       createdAt: now,
       updatedAt: now,
+      userId: user._id,
     });
     return chatId;
   },
@@ -50,6 +62,19 @@ export const updateTitle = mutation({
     title: v.string(),
   },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+    if (chat.userId !== user._id) {
+      throw new Error("Not authorized");
+    }
+
     await ctx.db.patch(args.chatId, {
       title: args.title,
       updatedAt: Date.now(),
@@ -61,6 +86,19 @@ export const updateTitle = mutation({
 export const remove = mutation({
   args: { chatId: v.id("chats") },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+    if (chat.userId !== user._id) {
+      throw new Error("Not authorized");
+    }
+
     // Delete all messages first
     const messages = await ctx.db
       .query("messages")
@@ -83,8 +121,17 @@ export const fork = mutation({
     messageIndex: v.number(),
   },
   handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
     const sourceChat = await ctx.db.get(args.chatId);
     if (!sourceChat) throw new Error("Chat not found");
+
+    if (sourceChat.userId !== user._id) {
+      throw new Error("Not authorized");
+    }
 
     const messages = await ctx.db
       .query("messages")
@@ -99,6 +146,7 @@ export const fork = mutation({
       title: `Fork: ${sourceChat.title}`,
       createdAt: now,
       updatedAt: now,
+      userId: user._id,
       parentId: args.chatId,
       forkMessageIndex: args.messageIndex,
     });

@@ -9,6 +9,8 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as auth from "../auth.js";
+import type * as betterAuth_auth from "../betterAuth/auth.js";
 import type * as chatThread from "../chatThread.js";
 import type * as chats from "../chats.js";
 import type * as comments from "../comments.js";
@@ -24,6 +26,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  auth: typeof auth;
+  "betterAuth/auth": typeof betterAuth_auth;
   chatThread: typeof chatThread;
   chats: typeof chats;
   comments: typeof comments;

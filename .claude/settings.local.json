@@ -16,7 +16,16 @@
       "Bash(node -e \"const {languages} = require(''@codemirror/language-data''); console.log(languages.map(l => l.name).slice(0, 30).join('', ''))\")",
       "Bash(echo:*)",
       "Bash(npx tsc --noEmit)",
-      "Bash(bun update:*)"
+      "Bash(bun update:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(pkill:*)",
+      "WebFetch(domain:www.swiftlatex.com)",
+      "WebFetch(domain:texlive.swiftlatex.com)",
+      "Bash(bun x pandoc:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

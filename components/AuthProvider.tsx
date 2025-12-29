@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, ReactNode } from "react";
+import { useConvexAuth } from "convex/react";
+import { authClient } from "@/lib/auth-client";
 
 interface User {
   id: string;
@@ -21,29 +23,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const storedUser = localStorage.getItem("zendor_user");
-      if (!storedUser) return null;
-      return JSON.parse(storedUser) as User;
-    } catch {
-      try {
-        localStorage.removeItem("zendor_user");
-      } catch {
-        // ignore
-      }
-      return null;
-    }
-  });
-  const [isLoading] = useState(false);
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { data: session } = authClient.useSession();
 
   const login = (redirect?: string) => {
     // Store redirect URL and go to sign-in page
-    if (redirect) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("zendor_redirect", redirect);
-      }
+    if (redirect && typeof window !== "undefined") {
+      localStorage.setItem("zendor_redirect", redirect);
     }
     if (typeof window !== "undefined") {
       window.location.href = "/sign-in";
@@ -51,19 +37,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    await authClient.signOut();
     if (typeof window !== "undefined") {
-      localStorage.removeItem("zendor_user");
-      setUser(null);
       window.location.href = "/";
     }
   };
+
+  const user = session?.user
+    ? {
+        id: session.user.id,
+        name: session.user.name || "User",
+        email: session.user.email || "",
+        image: session.user.image,
+      }
+    : null;
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated,
         login,
         logout,
       }}

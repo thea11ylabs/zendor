@@ -6,10 +6,13 @@ export default defineSchema({
     title: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    userId: v.string(), // Owner of the chat
     parentId: v.optional(v.id("chats")),
     forkMessageIndex: v.optional(v.number()),
     forkCount: v.optional(v.number()),
-  }).index("by_updated", ["updatedAt"]),
+  })
+    .index("by_updated", ["updatedAt"])
+    .index("by_user", ["userId", "updatedAt"]),
 
   messages: defineTable({
     chatId: v.id("chats"),
