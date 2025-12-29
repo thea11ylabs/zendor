@@ -13,9 +13,14 @@ export const tables = {
     image: v.optional(v.union(v.null(), v.string())),
     createdAt: v.number(),
     updatedAt: v.number(),
+    userId: v.optional(v.union(v.null(), v.string())),
+    stripeCustomerId: v.optional(v.union(v.null(), v.string())),
+    lastLoginMethod: v.optional(v.union(v.null(), v.string())),
+    username: v.optional(v.string()),
   })
     .index("email_name", ["email", "name"])
-    .index("name", ["name"]),
+    .index("name", ["name"])
+    .index("userId", ["userId"]),
   session: defineTable({
     expiresAt: v.number(),
     token: v.string(),
@@ -24,6 +29,7 @@ export const tables = {
     ipAddress: v.optional(v.union(v.null(), v.string())),
     userAgent: v.optional(v.union(v.null(), v.string())),
     userId: v.string(),
+    activeOrganizationId: v.optional(v.union(v.null(), v.string())),
   })
     .index("expiresAt", ["expiresAt"])
     .index("expiresAt_userId", ["expiresAt", "userId"])
@@ -61,6 +67,67 @@ export const tables = {
     privateKey: v.string(),
     createdAt: v.number(),
   }),
+  passkey: defineTable({
+    name: v.optional(v.union(v.null(), v.string())),
+    publicKey: v.string(),
+    userId: v.string(),
+    credentialID: v.string(),
+    counter: v.number(),
+    deviceType: v.string(),
+    backedUp: v.boolean(),
+    transports: v.optional(v.union(v.null(), v.string())),
+    createdAt: v.optional(v.union(v.null(), v.number())),
+    aaguid: v.optional(v.union(v.null(), v.string())),
+  })
+    .index("credentialID", ["credentialID"])
+    .index("userId", ["userId"]),
+  organization: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    logo: v.optional(v.union(v.null(), v.string())),
+    createdAt: v.number(),
+    metadata: v.optional(v.union(v.null(), v.string())),
+    ownerId: v.id('user'),
+  })
+    .index("name", ["name"])
+    .index("slug", ["slug"])
+    .index("ownerId", ["ownerId"]),
+
+  member: defineTable({
+    organizationId: v.string(),
+    userId: v.string(),
+    role: v.union(v.literal("admin"), v.literal("member"), v.literal("guest"), v.literal('owner'), v.literal('billing')),
+    createdAt: v.number(),
+  })
+    .index("organizationId", ["organizationId"])
+    .index("userId", ["userId"])
+    .index("role", ["role"]),
+  invitation: defineTable({
+    organizationId: v.string(),
+    email: v.string(),
+    role: v.optional(v.union(v.null(), v.string())),
+    status: v.string(),
+    expiresAt: v.number(),
+    inviterId: v.string(),
+  })
+    .index("organizationId", ["organizationId"])
+    .index("email", ["email"])
+    .index("role", ["role"])
+    .index("status", ["status"])
+    .index("inviterId", ["inviterId"]),
+  subscription: defineTable({
+    plan: v.string(),
+    referenceId: v.string(),
+    stripeCustomerId: v.optional(v.union(v.null(), v.string())),
+    stripeSubscriptionId: v.optional(v.union(v.null(), v.string())),
+    status: v.optional(v.union(v.null(), v.string())),
+    periodStart: v.optional(v.union(v.null(), v.number())),
+    periodEnd: v.optional(v.union(v.null(), v.number())),
+    trialStart: v.optional(v.union(v.null(), v.number())),
+    trialEnd: v.optional(v.union(v.null(), v.number())),
+    cancelAtPeriodEnd: v.optional(v.union(v.null(), v.boolean())),
+    seats: v.optional(v.union(v.null(), v.number())),
+  }).index("referenceId", ["referenceId"]),
 };
 
 const schema = defineSchema(tables);
