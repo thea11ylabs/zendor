@@ -13,8 +13,12 @@ const siteUrl = process.env.SITE_URL || "http://localhost:3000";
 // as well as helper methods for general use.
 type AuthComponent = ReturnType<typeof createClient<DataModel, typeof authSchema>>;
 
+// Type assertion for betterAuth component - generated after `npx convex dev`
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const betterAuthComponent = (components as any).betterAuth;
+
 export const authComponent: AuthComponent = createClient<DataModel, typeof authSchema>(
-  components.betterAuth,
+  betterAuthComponent,
   {
     verbose: true,
     authFunctions: internal.auth,

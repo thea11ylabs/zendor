@@ -14,7 +14,7 @@ interface PDFPreviewProps {
 
 // PDF Preview component now uses LaTeX-style PDF generation
 
-export default function PDFPreview({ content, title, author, onClose, inline = false }: PDFPreviewProps) {
+export default function PDFPreview({ content, title, onClose, inline = false }: PDFPreviewProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
