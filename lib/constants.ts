@@ -28,6 +28,7 @@ export const SHIKI_LANGUAGES = [
     "jsx",
     "tsx",
     "json",
+    "jsonc",
     "html",
     "css",
     "python",
