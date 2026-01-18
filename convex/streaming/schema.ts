@@ -1,0 +1,22 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v, type Infer } from "convex/values";
+
+export const streamStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("streaming"),
+  v.literal("done"),
+  v.literal("error"),
+  v.literal("timeout"),
+);
+export type StreamStatus = Infer<typeof streamStatusValidator>;
+
+export default defineSchema({
+  streams: defineTable({
+    status: streamStatusValidator,
+    lastChunkAt: v.optional(v.number()),
+  }).index("byStatus", ["status"]),
+  chunks: defineTable({
+    streamId: v.id("streams"),
+    text: v.string(),
+  }).index("byStream", ["streamId"]),
+});

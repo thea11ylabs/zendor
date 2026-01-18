@@ -1,0 +1,8 @@
+{
+  "node": {
+    "externalPackages": [
+      "@ai-sdk/openai",
+      "ai"
+    ]
+  }
+}
