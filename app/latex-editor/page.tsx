@@ -7,6 +7,8 @@ import {
   useDeferredValue,
   Activity,
 } from "react";
+import type { MarkdownEditorHandle } from "@/components/editor/MarkdownEditor";
+import type { PDFJSViewerHandle } from "@/components/pdf/PDFJSViewer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -123,8 +125,8 @@ export default function LaTeXEditorPage() {
   const [editFigureId, setEditFigureId] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfViewerRef = useRef<any>(null);
-  const editorRef = useRef<any>(null);
+  const pdfViewerRef = useRef<PDFJSViewerHandle>(null);
+  const editorRef = useRef<MarkdownEditorHandle>(null);
 
   const handleContentChange = useCallback(
     (newContent: string) => {

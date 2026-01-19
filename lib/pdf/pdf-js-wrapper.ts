@@ -223,7 +223,6 @@ export class PDFJSWrapper {
       const pdfDocument = this.viewer.pdfDocument;
       if (!pdfDocument) return;
 
-      const totalPages = pdfDocument.numPages;
       const scrollHeight = this.container.scrollHeight - this.container.clientHeight;
 
       const targetScroll = scrollHeight * Math.max(0, Math.min(1, percent));
