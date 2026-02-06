@@ -39,7 +39,64 @@ interface Slide {
   source: string;
 }
 
+interface BeamerFrame {
+  index: number;
+  title: string;
+  source: string;
+  startLine: number;
+  endLine: number;
+}
+
+interface SidebarEntry {
+  key: string;
+  slideIndex: number;
+  frameIndex: number | null;
+  syntax: SlideSyntax;
+  label: string;
+  orderLabel: string;
+}
+
 const STORAGE_KEY = "zendor-slides-deck-v1";
+const BEAMER_TEMPLATE = `\\documentclass{beamer}
+\\usetheme{Madrid}
+\\title{Presentation Title}
+\\author{Your Name}
+\\date{\\today}
+
+\\begin{document}
+
+\\begin{frame}
+\\titlepage
+\\end{frame}
+
+\\begin{frame}{Problem}
+\\begin{itemize}
+  \\item State the problem clearly
+  \\item Add a key data point
+  \\item Explain why now
+\\end{itemize}
+\\end{frame}
+
+\\begin{frame}{Plan}
+\\begin{columns}
+\\column{0.48\\textwidth}
+\\begin{block}{Track A}
+\\begin{itemize}
+  \\item Milestone 1
+  \\item Milestone 2
+\\end{itemize}
+\\end{block}
+\\column{0.48\\textwidth}
+\\begin{alertblock}{Risk}
+\\begin{itemize}
+  \\item Constraint or risk here
+\\end{itemize}
+\\end{alertblock}
+\\end{columns}
+\\end{frame}
+
+\\end{document}
+`;
 
 type DeckSave = (deck: {
   title: string;
@@ -133,12 +190,53 @@ function extractSlideLabel(slide: Slide): string {
   return (firstLine || "Untitled").trim().slice(0, 48);
 }
 
+function extractBeamerFrames(source: string): BeamerFrame[] {
+  const frameRegex = /\\begin\{frame\}(?:\[[^\]]*\])?(?:\{([^}]*)\})?([\s\S]*?)\\end\{frame\}/g;
+  const frames: BeamerFrame[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = frameRegex.exec(source)) !== null) {
+    const fullFrame = match[0];
+    const inlineTitle = (match[1] || "").trim();
+    const body = (match[2] || "").trim();
+    const bodyFrameTitle = body.match(/\\frametitle\{([^}]+)\}/)?.[1]?.trim();
+    const firstContent = body
+      .replace(/\\[a-zA-Z*]+(?:\[[^\]]*\])?(?:\{[^}]*\})?/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 42);
+
+    const startOffset = match.index;
+    const startLine = source.slice(0, startOffset).split("\n").length;
+    const endLine = startLine + fullFrame.split("\n").length - 1;
+
+    frames.push({
+      index: frames.length,
+      title: inlineTitle || bodyFrameTitle || firstContent || `Frame ${frames.length + 1}`,
+      source: fullFrame,
+      startLine,
+      endLine,
+    });
+  }
+
+  return frames;
+}
+
+function buildFramePreviewSource(slideSource: string, frameSource: string): string {
+  const preambleMatch = slideSource.match(/^[\s\S]*?\\begin\{document\}/);
+  const preamble = preambleMatch
+    ? preambleMatch[0]
+    : "\\documentclass{beamer}\n\\begin{document}";
+  return `${preamble}\n\n${frameSource}\n\n\\end{document}`;
+}
+
 export default function SlidesPage() {
   const stored = useMemo(() => getStoredDeck(), []);
   const [slides, setSlides] = useState<Slide[]>(
     () => stored?.slides ?? getDefaultSlides()
   );
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [currentBeamerFrameIndex, setCurrentBeamerFrameIndex] = useState(0);
   const [title, setTitle] = useState(
     () => stored?.title ?? "Untitled Presentation"
   );
@@ -154,6 +252,71 @@ export default function SlidesPage() {
     () => slides[currentSlideIndex] ?? slides[0],
     [slides, currentSlideIndex]
   );
+  const currentBeamerFrames = useMemo(
+    () =>
+      currentSlide?.syntax === "latex"
+        ? extractBeamerFrames(currentSlide.source)
+        : [],
+    [currentSlide]
+  );
+  const effectiveBeamerFrameIndex = useMemo(() => {
+    if (currentSlide.syntax !== "latex") return 0;
+    if (currentBeamerFrames.length === 0) return 0;
+    return Math.max(
+      0,
+      Math.min(currentBeamerFrameIndex, currentBeamerFrames.length - 1)
+    );
+  }, [currentSlide.syntax, currentBeamerFrames.length, currentBeamerFrameIndex]);
+  const currentBeamerFrame = useMemo(
+    () => currentBeamerFrames[effectiveBeamerFrameIndex] ?? null,
+    [currentBeamerFrames, effectiveBeamerFrameIndex]
+  );
+  const sidebarEntries = useMemo<SidebarEntry[]>(() => {
+    const entries: SidebarEntry[] = [];
+    slides.forEach((slide, slideIndex) => {
+      if (slide.syntax === "latex") {
+        const frames = extractBeamerFrames(slide.source);
+        if (frames.length > 0) {
+          frames.forEach((frame, frameIndex) => {
+            entries.push({
+              key: `${slide.id}-frame-${frameIndex}`,
+              slideIndex,
+              frameIndex,
+              syntax: slide.syntax,
+              label: frame.title,
+              orderLabel: `${slideIndex + 1}.${frameIndex + 1}`,
+            });
+          });
+          return;
+        }
+      }
+
+      entries.push({
+        key: slide.id,
+        slideIndex,
+        frameIndex: null,
+        syntax: slide.syntax,
+        label: extractSlideLabel(slide),
+        orderLabel: `${slideIndex + 1}`,
+      });
+    });
+    return entries;
+  }, [slides]);
+  const currentSidebarIndex = useMemo(
+    () =>
+      sidebarEntries.findIndex((entry) => {
+        if (entry.slideIndex !== currentSlideIndex) return false;
+        if (entry.frameIndex === null) return currentSlide.syntax !== "latex";
+        return entry.frameIndex === effectiveBeamerFrameIndex;
+      }),
+    [sidebarEntries, currentSlideIndex, currentSlide.syntax, effectiveBeamerFrameIndex]
+  );
+  const previewContent = useMemo(() => {
+    if (currentSlide.syntax !== "latex" || !currentBeamerFrame) {
+      return currentSlide.source;
+    }
+    return buildFramePreviewSource(currentSlide.source, currentBeamerFrame.source);
+  }, [currentSlide, currentBeamerFrame]);
 
   useEffect(() => {
     if (!debouncedSaveRef.current) {
@@ -223,15 +386,19 @@ export default function SlidesPage() {
   };
 
   const nextSlide = () => {
-    if (currentSlideIndex < slides.length - 1) {
-      setCurrentSlideIndex(currentSlideIndex + 1);
+    if (currentSidebarIndex < 0 || currentSidebarIndex >= sidebarEntries.length - 1) {
+      return;
     }
+    const next = sidebarEntries[currentSidebarIndex + 1];
+    setCurrentSlideIndex(next.slideIndex);
+    setCurrentBeamerFrameIndex(next.frameIndex ?? 0);
   };
 
   const prevSlide = () => {
-    if (currentSlideIndex > 0) {
-      setCurrentSlideIndex(currentSlideIndex - 1);
-    }
+    if (currentSidebarIndex <= 0) return;
+    const prev = sidebarEntries[currentSidebarIndex - 1];
+    setCurrentSlideIndex(prev.slideIndex);
+    setCurrentBeamerFrameIndex(prev.frameIndex ?? 0);
   };
 
   const handlePreviewClick = useCallback(
@@ -244,11 +411,29 @@ export default function SlidesPage() {
           ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
           : 0;
       const totalLines = currentSlide.source.split("\n").length;
-      const targetLine = Math.max(1, Math.round(percent * (totalLines - 1)) + 1);
+      let targetLine = Math.max(1, Math.round(percent * (totalLines - 1)) + 1);
+      if (currentSlide.syntax === "latex" && currentBeamerFrame) {
+        const frameLineSpan = Math.max(
+          1,
+          currentBeamerFrame.endLine - currentBeamerFrame.startLine
+        );
+        targetLine =
+          currentBeamerFrame.startLine + Math.round(percent * frameLineSpan);
+      }
       editor.scrollToLine(targetLine);
     },
-    [currentSlide.source]
+    [currentSlide.source, currentSlide.syntax, currentBeamerFrame]
   );
+
+  const handleInsertBeamerTemplate = useCallback(() => {
+    if (currentSlide.syntax !== "latex") return;
+    const shouldReplace =
+      !currentSlide.source.trim() ||
+      window.confirm("Replace current LaTeX source with Beamer starter template?");
+    if (!shouldReplace) return;
+    updateCurrentSlideSource(BEAMER_TEMPLATE);
+    setCurrentBeamerFrameIndex(0);
+  }, [currentSlide.syntax, currentSlide.source, updateCurrentSlideSource]);
 
   return (
     <div className="h-screen flex flex-col bg-zinc-950">
@@ -307,14 +492,20 @@ export default function SlidesPage() {
         {/* Slides Thumbnails */}
         <aside className="w-48 bg-zinc-900 border-r border-zinc-800 flex flex-col">
           <div className="flex-1 p-2 overflow-y-auto">
-            {slides.map((slide, index) => {
-              const label = extractSlideLabel(slide);
+            {sidebarEntries.map((entry) => {
+              const isActive =
+                entry.slideIndex === currentSlideIndex &&
+                ((entry.frameIndex === null && currentSlide.syntax !== "latex") ||
+                  entry.frameIndex === effectiveBeamerFrameIndex);
               return (
                 <div
-                  key={slide.id}
-                  onClick={() => setCurrentSlideIndex(index)}
+                  key={entry.key}
+                  onClick={() => {
+                    setCurrentSlideIndex(entry.slideIndex);
+                    setCurrentBeamerFrameIndex(entry.frameIndex ?? 0);
+                  }}
                   className={`mb-2 cursor-pointer rounded border-2 transition-colors ${
-                    index === currentSlideIndex
+                    isActive
                       ? "border-blue-500"
                       : "border-transparent hover:border-zinc-600"
                   }`}
@@ -323,14 +514,14 @@ export default function SlidesPage() {
                     <div className="absolute inset-0 p-2">
                       <div className="flex items-center justify-between">
                         <div className="text-[9px] text-zinc-500">
-                          {index + 1}
+                          {entry.orderLabel}
                         </div>
                         <div className="text-[8px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 uppercase">
-                          {slide.syntax}
+                          {entry.syntax}
                         </div>
                       </div>
                       <div className="mt-1 text-[9px] leading-snug text-zinc-200 line-clamp-3">
-                        {label}
+                        {entry.label}
                       </div>
                     </div>
                   </div>
@@ -396,7 +587,7 @@ export default function SlidesPage() {
                         className="h-full w-full overflow-auto p-6"
                         onClick={handlePreviewClick}
                       >
-                        <LaTeXPreview content={currentSlide.source} />
+                        <LaTeXPreview content={previewContent} />
                       </div>
                     ) : (
                       <div className="h-full w-full overflow-auto p-6" onClick={handlePreviewClick}>
@@ -427,13 +618,13 @@ export default function SlidesPage() {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <span className="text-sm text-zinc-400 min-w-[80px] text-center">
-              {currentSlideIndex + 1} / {slides.length}
+              {Math.max(1, currentSidebarIndex + 1)} / {sidebarEntries.length}
             </span>
             <Button
               variant="ghost"
               size="icon"
               onClick={nextSlide}
-              disabled={currentSlideIndex === slides.length - 1}
+              disabled={currentSidebarIndex === sidebarEntries.length - 1}
               className="text-zinc-300"
             >
               <ChevronRight className="h-5 w-5" />
@@ -491,6 +682,15 @@ export default function SlidesPage() {
                 </Button>
               </div>
             </div>
+            {currentSlide.syntax === "latex" && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleInsertBeamerTemplate}
+              >
+                Insert Beamer Starter Template
+              </Button>
+            )}
             <div>
               <label className="block text-xs text-zinc-400 mb-2">Tips</label>
               <div className="text-xs text-zinc-500 space-y-2">

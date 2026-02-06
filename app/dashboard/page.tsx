@@ -8,6 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { api } from "@/convex/_generated/api";
 import {
   FileText,
+  Plus,
   Github,
   LogOut,
   Loader,
@@ -42,10 +43,12 @@ export default function DashboardPage() {
     isAuthenticated ? {} : "skip",
     { initialNumItems: 20 }
   );
+  const createDocument = useMutation(api.documents.create);
   const deleteDocument = useMutation(api.documents.remove);
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<Id<"documents"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const isLoadingDocs = status === "LoadingFirstPage";
   const canLoadMore = status === "CanLoadMore";
@@ -54,6 +57,20 @@ export default function DashboardPage() {
   if (!isLoading && !isAuthenticated) {
     router.push("/sign-in");
   }
+
+  const handleCreateDocument = async (type: "markdown" | "latex") => {
+    if (type === "latex") {
+      router.push("/latex-editor");
+      return;
+    }
+
+    try {
+      const documentId = await createDocument({});
+      router.push(`/editor?doc=${documentId}`);
+    } catch (error) {
+      console.error("Failed to create document:", error);
+    }
+  };
 
   const handleDeleteDocument = async (docId: Id<"documents">) => {
     setIsDeleting(true);
@@ -229,6 +246,13 @@ export default function DashboardPage() {
                 Create and manage your markdown documents
               </p>
             </div>
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Create Document
+            </button>
           </div>
 
           {/* Documents List */}
@@ -311,6 +335,13 @@ export default function DashboardPage() {
               <p className="text-zinc-500 mb-6">
                 Create your first document to get started
               </p>
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Create Document
+              </button>
             </div>
           )}
 
@@ -327,6 +358,54 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+
+      {/* Create Document Type Dialog */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-white mb-4">
+              Create New Document
+            </h3>
+            <p className="text-zinc-400 text-sm mb-6">
+              Choose the type of document you want to create:
+            </p>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <button
+                onClick={() => {
+                  setShowCreateDialog(false);
+                  handleCreateDocument("markdown");
+                }}
+                className="flex flex-col items-center gap-3 p-6 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-violet-600 rounded-xl transition-all group"
+              >
+                <FileText className="w-8 h-8 text-violet-400 group-hover:text-violet-300" />
+                <div className="text-center">
+                  <div className="font-semibold text-white mb-1">Markdown</div>
+                  <div className="text-xs text-zinc-400">GitHub-flavored markdown with LaTeX math</div>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateDialog(false);
+                  handleCreateDocument("latex");
+                }}
+                className="flex flex-col items-center gap-3 p-6 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-violet-600 rounded-xl transition-all group"
+              >
+                <FileText className="w-8 h-8 text-violet-400 group-hover:text-violet-300" />
+                <div className="text-center">
+                  <div className="font-semibold text-white mb-1">LaTeX</div>
+                  <div className="text-xs text-zinc-400">Pure LaTeX document with full typesetting</div>
+                </div>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowCreateDialog(false)}
+              className="w-full px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg font-medium hover:bg-zinc-700 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirmId && (

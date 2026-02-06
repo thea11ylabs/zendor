@@ -10,15 +10,35 @@ interface LaTeXPreviewProps {
   scrollPercent?: number;
 }
 
+const UNSUPPORTED_TEX_PATTERNS: Array<{ label: string; regex: RegExp }> = [
+  { label: "\\begin{tikzpicture}", regex: /\\begin\{tikzpicture\}/ },
+  { label: "\\begin{axis}", regex: /\\begin\{axis\}/ },
+  { label: "\\animategraphics", regex: /\\animategraphics\b/ },
+  { label: "\\movie", regex: /\\movie\b/ },
+  { label: "\\includemedia", regex: /\\includemedia\b/ },
+  { label: "\\only", regex: /\\only(?:<[^>]+>)?\{/ },
+  { label: "\\onslide", regex: /\\onslide(?:<[^>]+>)?/ },
+  { label: "\\alt", regex: /\\alt(?:<[^>]+>)?\{/ },
+  { label: "\\transdissolve", regex: /\\transdissolve\b/ },
+];
+
+function detectUnsupportedCommands(latex: string): string[] {
+  return UNSUPPORTED_TEX_PATTERNS.filter((pattern) =>
+    pattern.regex.test(latex)
+  ).map((pattern) => pattern.label);
+}
+
 // Convert LaTeX to renderable HTML
 function parseLatex(latex: string): {
   html: string;
   mermaidDiagrams: string[];
+  unsupportedCommands: string[];
 } {
   let html = latex;
   let equationCounter = 0;
   const mathBlocks: string[] = [];
   const mermaidDiagrams: string[] = [];
+  const unsupportedCommands = detectUnsupportedCommands(latex);
 
   // Helper to protect math from other transformations
   const protectMath = (content: string): string => {
@@ -561,14 +581,14 @@ function parseLatex(latex: string): {
     html = html.replace(`%%MATH${i}%%`, block);
   });
 
-  return { html, mermaidDiagrams };
+  return { html, mermaidDiagrams, unsupportedCommands };
 }
 
 export default function LaTeXPreview({
   content,
   scrollPercent,
 }: LaTeXPreviewProps) {
-  const { html, mermaidDiagrams } = useMemo(
+  const { html, mermaidDiagrams, unsupportedCommands } = useMemo(
     () => parseLatex(content),
     [content]
   );
@@ -620,7 +640,15 @@ export default function LaTeXPreview({
 
   return (
     <div ref={containerRef} className="h-full w-full overflow-auto bg-zinc-900 p-8">
-      <div className="max-w-4xl mx-auto prose prose-invert">{renderContent}</div>
+      <div className="max-w-4xl mx-auto prose prose-invert">
+        {unsupportedCommands.length > 0 && (
+          <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 not-prose">
+            <span className="font-semibold">Preview limits:</span>{" "}
+            {unsupportedCommands.join(", ")}
+          </div>
+        )}
+        {renderContent}
+      </div>
     </div>
   );
 }

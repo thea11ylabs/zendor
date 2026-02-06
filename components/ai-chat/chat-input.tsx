@@ -32,6 +32,7 @@ export interface AttachedFile {
   file: File;
   preview?: string;
   textPreview?: string;
+  pdfThumbnail?: string;
 }
 
 const MAX_ATTACHMENTS = 10;
@@ -58,6 +59,11 @@ function canPreviewText(file: File): boolean {
   return TEXT_PREVIEW_EXTENSIONS.has(extension);
 }
 
+function isPdfFile(file: File): boolean {
+  if (file.type === "application/pdf") return true;
+  return getFileExtension(file.name) === "pdf";
+}
+
 async function readTextPreview(file: File): Promise<string | undefined> {
   if (!canPreviewText(file)) return undefined;
   try {
@@ -66,6 +72,40 @@ async function readTextPreview(file: File): Promise<string | undefined> {
     if (!compact) return undefined;
     return compact.slice(0, TEXT_PREVIEW_MAX_CHARS);
   } catch {
+    return undefined;
+  }
+}
+
+async function renderPdfThumbnail(file: File): Promise<string | undefined> {
+  try {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    if (typeof window !== "undefined") {
+      const workerSrc = new URL(
+        "pdfjs-dist/legacy/build/pdf.worker.mjs",
+        import.meta.url
+      ).toString();
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    }
+
+    const bytes = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: bytes }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 0.28 });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(120, Math.floor(viewport.width));
+    canvas.height = Math.max(160, Math.floor(viewport.height));
+
+    const context = canvas.getContext("2d");
+    if (!context) return undefined;
+
+    await page.render({
+      canvas,
+      canvasContext: context,
+      viewport,
+    }).promise;
+    return canvas.toDataURL("image/png");
+  } catch (error) {
+    console.error("Failed to render PDF thumbnail", error);
     return undefined;
   }
 }
@@ -144,14 +184,17 @@ export function ChatInput({
       .slice(0, remainingSlots);
 
     const newFiles: AttachedFile[] = await Promise.all(
-      validFiles.map(async (file) => ({
-        id: Math.random().toString(36).slice(2),
-        file,
-        preview: file.type.startsWith("image/")
-          ? URL.createObjectURL(file)
-          : undefined,
-        textPreview: await readTextPreview(file),
-      }))
+      validFiles.map(async (file) => {
+        const isImage = file.type.startsWith("image/");
+        const pdf = isPdfFile(file);
+        return {
+          id: Math.random().toString(36).slice(2),
+          file,
+          preview: isImage ? URL.createObjectURL(file) : undefined,
+          textPreview: await readTextPreview(file),
+          pdfThumbnail: pdf ? await renderPdfThumbnail(file) : undefined,
+        };
+      })
     );
     onFilesChange?.([...files, ...newFiles]);
   };
@@ -218,7 +261,7 @@ export function ChatInput({
                 key={f.id}
                 className="relative group border border-border rounded-lg bg-background-tertiary/40 p-2 min-w-[220px] max-w-[280px]"
               >
-                {f.preview ? (
+                {f.preview && f.file.type.startsWith("image/") ? (
                   <div className="flex gap-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -232,6 +275,39 @@ export function ChatInput({
                       </div>
                       <div className="text-[10px] text-foreground-muted">
                         {formatFileSize(f.file.size)} · image
+                      </div>
+                    </div>
+                  </div>
+                ) : isPdfFile(f.file) ? (
+                  <div className="flex gap-2">
+                    <div className="h-20 w-16 rounded-lg border border-border shrink-0 bg-zinc-950 overflow-hidden flex items-center justify-center">
+                      {f.pdfThumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={f.pdfThumbnail}
+                          alt={`${f.file.name} preview`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-red-700 text-white flex flex-col items-center justify-center">
+                          <div className="text-lg font-black leading-none">A</div>
+                          <div className="text-[8px] font-semibold tracking-wide mt-1">
+                            PDF
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs text-foreground truncate">
+                        {f.file.name}
+                      </div>
+                      <div className="text-[10px] text-foreground-muted mb-1">
+                        {formatFileSize(f.file.size)} · PDF
+                      </div>
+                      <div className="text-[11px] text-foreground-muted line-clamp-2">
+                        {f.pdfThumbnail
+                          ? "PDF preview loaded."
+                          : "Adobe PDF"}
                       </div>
                     </div>
                   </div>
@@ -252,8 +328,9 @@ export function ChatInput({
                         {f.file.type || "application/octet-stream"}
                       </div>
                       <div className="text-[11px] text-foreground-muted line-clamp-2">
-                        {f.textPreview || "Preview available after upload."}
+                        {f.textPreview || "No inline preview for this file type."}
                       </div>
+                      {/* TODO: Add previews for DOCX/XLSX/PPTX via client parsers if those types are allowed later. */}
                     </div>
                   </div>
                 )}
