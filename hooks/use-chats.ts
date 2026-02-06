@@ -75,7 +75,13 @@ export function useChatThread(chatId: Id<"chats"> | null) {
       role: "user" | "assistant",
       content: string,
       chatIdForMessage?: Id<"chats">,
-      attachments?: { name: string; type: string; url: string }[],
+      attachments?: {
+        name: string;
+        type: string;
+        url: string;
+        size?: number;
+        storageId?: Id<"_storage">;
+      }[],
       editVersion?: number
     ) => {
       const targetChatId = chatIdForMessage ?? chatId;

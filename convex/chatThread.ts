@@ -198,7 +198,13 @@ export const streamChat = httpAction(async (ctx, request) => {
       .map(m => ({
         id: m._id,
         role: m.role as "user" | "assistant",
-        parts: [{ type: "text" as const, text: m.content }],
+        parts: [{
+          type: "text" as const,
+          text:
+            m.attachments && m.attachments.length > 0
+              ? `${m.content}\n\nAttachments:\n${m.attachments.map((attachment) => `- ${attachment.name} (${attachment.type}) ${attachment.url ? `[${attachment.url}]` : ""}`).join("\n")}`
+              : m.content,
+        }],
       }));
 
     const model = metadata.model;

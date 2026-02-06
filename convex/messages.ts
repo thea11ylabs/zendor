@@ -32,6 +32,8 @@ export const add = mutation({
       name: v.string(),
       type: v.string(),
       url: v.string(),
+      size: v.optional(v.number()),
+      storageId: v.optional(v.id("_storage")),
     }))),
     editVersion: v.optional(v.number()),
     skipEmbedding: v.optional(v.boolean()),

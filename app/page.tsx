@@ -16,6 +16,7 @@ import { useConvexAuth } from "convex/react";
 
 export default function LandingPage() {
   const { isAuthenticated } = useConvexAuth();
+  console.log(process.env.NEXT_PUBLIC_CONVEX_SITE_URL);
 
   return (
     <div className="min-h-screen w-full relative bg-black">

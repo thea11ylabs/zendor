@@ -18,6 +18,14 @@ interface UseStreamChatOptions {
   webSearch?: boolean;
 }
 
+type MessageAttachment = {
+  name: string;
+  type: string;
+  url: string;
+  size?: number;
+  storageId?: Id<"_storage">;
+};
+
 export function useStreamChat({ chatId, model = AVAILABLE_MODELS[0], reasoningEffort, webSearch }: UseStreamChatOptions) {
   const convexSiteUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
   const setShouldStream = useSetAtom(shouldStreamAtom);
@@ -48,14 +56,24 @@ export function useStreamChat({ chatId, model = AVAILABLE_MODELS[0], reasoningEf
   const updateTitleMutation = useMutation(api.chats.updateTitle);
   const generateTitleAction = useAction(api.messages.generateTitle);
 
-  const sendMessage = useCallback(async (content: string, editVersion?: number) => {
+  const sendMessage = useCallback(async (
+    content: string,
+    editVersion?: number,
+    attachments?: MessageAttachment[]
+  ) => {
     if (!chatId || threadIsStreaming) return;
 
     setShouldStream(true); // Optimistic update
     setError(null); // Clear previous errors
 
     // Add user message
-    const addMessageStatus = await addMessage("user", content, chatId, undefined, editVersion);
+    const addMessageStatus = await addMessage(
+      "user",
+      content,
+      chatId,
+      attachments,
+      editVersion
+    );
 
     if (!addMessageStatus) return; // Error handled by executeWithErrorHandling
 
@@ -72,7 +90,10 @@ export function useStreamChat({ chatId, model = AVAILABLE_MODELS[0], reasoningEf
     }
   }, [chatId, threadIsStreaming, setShouldStream, addMessage, createStreamMutation, model, reasoningEffort, webSearch, executeWithErrorHandling]);
 
-  const createChatAndSend = useCallback(async (content: string): Promise<Id<"chats"> | null> => {
+  const createChatAndSend = useCallback(async (
+    content: string,
+    attachments?: MessageAttachment[]
+  ): Promise<Id<"chats"> | null> => {
 
     const tempTitle = content.slice(0, 50) + (content.length > 50 ? "..." : "");
 
@@ -92,7 +113,12 @@ export function useStreamChat({ chatId, model = AVAILABLE_MODELS[0], reasoningEf
     const newChatId = newChatResult;
 
     // Add user message
-    const addMessageStatus = await addMessage("user", content, newChatId);
+    const addMessageStatus = await addMessage(
+      "user",
+      content,
+      newChatId,
+      attachments
+    );
 
     if (!addMessageStatus) {
       setShouldStream(false);
@@ -136,6 +162,7 @@ export function useStreamChat({ chatId, model = AVAILABLE_MODELS[0], reasoningEf
     content: msg.content,
     streamId: msg.streamId,
     editVersion: msg.editVersion,
+    attachments: msg.attachments,
   }));
 
   const stop = useCallback(async () => {

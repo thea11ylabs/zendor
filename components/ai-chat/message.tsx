@@ -25,6 +25,12 @@ interface Message {
   content: string;
   streamId?: string;
   editVersion?: number;
+  attachments?: {
+    name: string;
+    type: string;
+    url: string;
+    size?: number;
+  }[];
 }
 
 interface ChatMessageProps {
@@ -85,6 +91,7 @@ export function ChatMessage({
   const isUser = message.role === "user";
   // Message is streaming if it has a streamId but no content yet
   const isStreaming = !isUser && !!message.streamId && !message.content;
+  const hasAttachments = (message.attachments?.length ?? 0) > 0;
 
   return (
     <div
@@ -154,6 +161,33 @@ export function ChatMessage({
               </div>
             ) : (
               <MarkdownRenderer content={message.content} />
+            )}
+
+            {hasAttachments && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {message.attachments?.map((attachment) => {
+                  const isImage = attachment.type.startsWith("image/");
+                  return (
+                    <a
+                      key={`${message.id}-${attachment.url}`}
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-lg border border-white/10 bg-black/20 px-2 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                    >
+                      {isImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={attachment.url}
+                          alt={attachment.name}
+                          className="h-20 w-20 rounded object-cover mb-1"
+                        />
+                      ) : null}
+                      <div className="max-w-40 truncate">{attachment.name}</div>
+                    </a>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

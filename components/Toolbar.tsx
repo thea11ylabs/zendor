@@ -23,6 +23,10 @@ import {
   NotebookPen,
   Share2,
   Presentation,
+  User,
+  Settings,
+  HelpCircle,
+  LogOut,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,8 +35,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export type ViewMode = "doc" | "editor" | "preview" | "split";
 export type EditorMode = "markdown" | "latex";
@@ -120,6 +134,8 @@ export default function Toolbar({
   onLogin,
   hasDocumentId = false,
 }: ToolbarProps) {
+  const router = useRouter();
+
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-2">
       <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -445,24 +461,80 @@ export default function Toolbar({
 
         {/* GitHub Auth Section */}
         {isAuthenticated && user ? (
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard"
-              className="flex items-center px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-              title="Dashboard"
-            >
-              <LayoutDashboard className="h-4 w-4" />
-            </Link>
-            <div className="flex items-center px-2">
-              <Image
-                src={user.avatar_url}
-                alt={user.name || user.login}
-                width={24}
-                height={24}
-                className="w-6 h-6 rounded-full"
-              />
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+                <div className="w-7 h-7 bg-linear-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                  {user.avatar_url ? (
+                    <Image
+                      src={user.avatar_url}
+                      alt={user.name || user.login}
+                      width={28}
+                      height={28}
+                      className="w-7 h-7 rounded-full"
+                    />
+                  ) : (
+                    <User className="w-4 h-4 text-white" />
+                  )}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user.name || user.login}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    @{user.login}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard")}
+                className="cursor-pointer"
+              >
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span>Dashboard</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push("/editor")}
+                className="cursor-pointer"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                <span>New Document</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push("/settings")}
+                className="cursor-pointer"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => window.open("https://github.com/thea11ylabs/zendor", "_blank")}
+                className="cursor-pointer"
+              >
+                <Github className="mr-2 h-4 w-4" />
+                <span>GitHub</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => window.open("https://docs.zendor.dev", "_blank")}
+                className="cursor-pointer"
+              >
+                <HelpCircle className="mr-2 h-4 w-4" />
+                <span>Documentation</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => authClient.signOut()}
+                className="cursor-pointer text-red-600 focus:text-red-600"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <button
             onClick={onLogin}

@@ -19,6 +19,12 @@ interface Message {
   content: string;
   streamId?: string;
   editVersion?: number;
+  attachments?: {
+    name: string;
+    type: string;
+    url: string;
+    size?: number;
+  }[];
 }
 
 interface ChatContainerProps {

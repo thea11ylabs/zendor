@@ -24,6 +24,8 @@ export default defineSchema({
       name: v.string(),
       type: v.string(),
       url: v.string(),
+      size: v.optional(v.number()),
+      storageId: v.optional(v.id("_storage")),
     }))),
     editVersion: v.optional(v.number()), // Track edit count (e.g., 3/3 means 3rd edit)
     embedding: v.optional(v.array(v.float64())), // For RAG search

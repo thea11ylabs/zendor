@@ -182,6 +182,13 @@ function parseLatex(latex: string): {
   // Remove preamble
   html = html.replace(/\\documentclass(\[[^\]]*\])?\{[^}]+\}/g, "");
   html = html.replace(/\\usepackage(\[[^\]]*\])?\{[^}]+\}/g, "");
+  html = html.replace(/\\usetheme\{[^}]+\}/g, "");
+  html = html.replace(/\\usecolortheme\{[^}]+\}/g, "");
+  html = html.replace(/\\usefonttheme\{[^}]+\}/g, "");
+  html = html.replace(/\\setbeamertemplate\{[^}]+\}\{[^}]*\}/g, "");
+  html = html.replace(/\\setbeamercolor\{[^}]+\}\{[^}]*\}/g, "");
+  html = html.replace(/\\setbeamerfont\{[^}]+\}\{[^}]*\}/g, "");
+  html = html.replace(/\\beamertemplatenavigationsymbolsempty/g, "");
   html = html.replace(/\\title\{[^}]+\}/g, "");
   html = html.replace(/\\author\{[^}]+\}/g, "");
   html = html.replace(/\\date\{[^}]+\}/g, "");
@@ -195,6 +202,48 @@ function parseLatex(latex: string): {
   } else {
     html = html.replace(/\\maketitle/g, "");
   }
+
+  // Beamer slide primitives
+  html = html.replace(
+    /\\begin\{frame\}(?:\[[^\]]*\])?(?:\{([^}]*)\})?([\s\S]*?)\\end\{frame\}/g,
+    (_, frameTitle, frameBody) => {
+      const titleNode = frameTitle
+        ? `<h3 class="text-2xl font-semibold text-zinc-100 mb-4">${frameTitle}</h3>`
+        : "";
+      return `<section class="my-6 rounded-xl border border-zinc-700/80 bg-zinc-900/70 p-6">${titleNode}${frameBody}</section>`;
+    }
+  );
+  html = html.replace(
+    /\\frametitle\{([^}]+)\}/g,
+    '<h3 class="text-2xl font-semibold text-zinc-100 mb-4">$1</h3>'
+  );
+  html = html.replace(
+    /\\framesubtitle\{([^}]+)\}/g,
+    '<p class="text-sm text-zinc-400 mb-4">$1</p>'
+  );
+  html = html.replace(
+    /\\begin\{block\}\{([^}]+)\}([\s\S]*?)\\end\{block\}/g,
+    '<div class="my-4 rounded-lg border border-zinc-700 bg-zinc-800/60 p-4"><div class="text-sm font-semibold text-zinc-100 mb-2">$1</div><div class="text-zinc-300">$2</div></div>'
+  );
+  html = html.replace(
+    /\\begin\{alertblock\}\{([^}]+)\}([\s\S]*?)\\end\{alertblock\}/g,
+    '<div class="my-4 rounded-lg border border-red-900/70 bg-red-950/20 p-4"><div class="text-sm font-semibold text-red-300 mb-2">$1</div><div class="text-red-100">$2</div></div>'
+  );
+  html = html.replace(
+    /\\begin\{exampleblock\}\{([^}]+)\}([\s\S]*?)\\end\{exampleblock\}/g,
+    '<div class="my-4 rounded-lg border border-green-900/70 bg-green-950/20 p-4"><div class="text-sm font-semibold text-green-300 mb-2">$1</div><div class="text-green-100">$2</div></div>'
+  );
+  html = html.replace(
+    /\\begin\{columns\}([\s\S]*?)\\end\{columns\}/g,
+    '<div class="my-4 grid grid-cols-1 md:grid-cols-2 gap-4"><div class="rounded-md border border-zinc-800/60 p-3">$1</div></div>'
+  );
+  html = html.replace(
+    /\\column(?:\[[^\]]*\])?\{[^}]+\}/g,
+    '</div><div class="rounded-md border border-zinc-800/60 p-3">'
+  );
+  html = html.replace(/\\pause/g, "");
+  html = html.replace(/<\d+-?>/g, "");
+  html = html.replace(/\\note\{[^}]*\}/g, "");
 
   // Abstract
   html = html.replace(

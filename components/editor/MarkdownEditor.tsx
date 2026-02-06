@@ -81,6 +81,7 @@ export interface MarkdownEditorHandle {
   getValue: () => string;
   setValue: (value: string) => void;
   scrollToPercent: (percent: number) => void;
+  scrollToLine: (lineNumber: number) => void;
 }
 
 // Static theme extension - never recreated
@@ -198,12 +199,29 @@ const MarkdownEditor = memo(
           if (view) {
             const totalLines = view.state.doc.lines;
             const targetLine = Math.floor(percent * (totalLines - 1)) + 1;
-            const lineInfo = view.state.doc.line(Math.max(1, Math.min(totalLines, targetLine)));
+            const lineInfo = view.state.doc.line(
+              Math.max(1, Math.min(totalLines, targetLine))
+            );
 
             view.dispatch({
               selection: { anchor: lineInfo.from, head: lineInfo.from },
               scrollIntoView: true,
             });
+            view.focus();
+          }
+        },
+        scrollToLine: (lineNumber: number) => {
+          const view = editorRef.current?.view;
+          if (view) {
+            const totalLines = view.state.doc.lines;
+            const clamped = Math.max(1, Math.min(totalLines, lineNumber));
+            const lineInfo = view.state.doc.line(clamped);
+
+            view.dispatch({
+              selection: { anchor: lineInfo.from, head: lineInfo.from },
+              scrollIntoView: true,
+            });
+            view.focus();
           }
         },
       }),

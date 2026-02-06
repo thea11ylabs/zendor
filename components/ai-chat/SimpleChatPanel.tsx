@@ -5,6 +5,8 @@ import { ChatContainer } from "./chat-container";
 import { ThinkingSidebar, type ThinkingSession } from "./thinking-sidebar";
 import { useStreamChat } from "../../hooks/use-stream-chat";
 import { useAtom } from "jotai";
+import { useMutation } from "convex/react";
+import type { FunctionReference } from "convex/server";
 import {
   selectedModelAtom,
   reasoningEffortAtom,
@@ -13,6 +15,8 @@ import {
   sessionIdAtom,
   sessionChatThreadsAtom,
 } from "../../stores/atoms";
+import type { Id } from "@/convex/_generated/dataModel";
+import type { AttachedFile } from "./chat-input";
 
 interface SimpleChatPanelProps {
   isOpen: boolean;
@@ -25,6 +29,18 @@ export function SimpleChatPanel({
   onClose,
   documentContent,
 }: SimpleChatPanelProps) {
+  const generateUploadUrlRef = "fileUploads:generateUploadUrl" as unknown as FunctionReference<
+    "mutation",
+    "public",
+    Record<string, never>,
+    string
+  >;
+  const getFileUrlRef = "fileUploads:getFileUrl" as unknown as FunctionReference<
+    "mutation",
+    "public",
+    { storageId: Id<"_storage"> },
+    string | null
+  >;
   const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom);
   const [reasoningEffort, setReasoningEffort] = useAtom(reasoningEffortAtom);
   const [webSearch, setWebSearch] = useAtom(webSearchAtom);
@@ -33,6 +49,7 @@ export function SimpleChatPanel({
   const [sessionThreads, setSessionThreads] = useAtom(sessionChatThreadsAtom);
   const [inputValue, setInputValue] = useState("");
   const [displayValue, setDisplayValue] = useState("");
+  const [files, setFiles] = useState<AttachedFile[]>([]);
   const [thinkingSidebarOpen, setThinkingSidebarOpen] = useState(false);
   const [thinkingSessions, setThinkingSessions] = useState<ThinkingSession[]>(
     []
@@ -60,6 +77,53 @@ export function SimpleChatPanel({
       selectedModel.id === "gpt-5.1" ? reasoningEffort : undefined,
     webSearch,
   });
+  const generateUploadUrl = useMutation(generateUploadUrlRef);
+  const getFileUrl = useMutation(getFileUrlRef);
+
+  const clearFiles = useCallback(() => {
+    setFiles((prev) => {
+      for (const file of prev) {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      }
+      return [];
+    });
+  }, []);
+
+  const uploadFiles = useCallback(async (pendingFiles: AttachedFile[]) => {
+    if (pendingFiles.length === 0) return [];
+
+    const uploaded = await Promise.all(
+      pendingFiles.map(async (pendingFile) => {
+        const uploadUrl = await generateUploadUrl({});
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": pendingFile.file.type || "application/octet-stream",
+          },
+          body: pendingFile.file,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${pendingFile.file.name}`);
+        }
+
+        const { storageId } = (await response.json()) as {
+          storageId: Id<"_storage">;
+        };
+        const fileUrl = await getFileUrl({ storageId });
+
+        return {
+          name: pendingFile.file.name,
+          type: pendingFile.file.type || "application/octet-stream",
+          size: pendingFile.file.size,
+          storageId,
+          url: fileUrl ?? "",
+        };
+      })
+    );
+
+    return uploaded;
+  }, [generateUploadUrl, getFileUrl]);
 
   // Handle opening thinking sidebar
   const handleOpenThinkingSidebar = useCallback(
@@ -116,7 +180,7 @@ export function SimpleChatPanel({
 
   // Handle submit
   const handleSubmit = useCallback(async () => {
-    if (!inputValue.trim() || isStreaming) {
+    if ((!inputValue.trim() && files.length === 0) || isStreaming) {
       return;
     }
 
@@ -136,25 +200,47 @@ export function SimpleChatPanel({
       );
     }
 
-    setInputValue("");
-    setDisplayValue("");
+    try {
+      let attachments: Array<{
+        name: string;
+        type: string;
+        url: string;
+        size?: number;
+        storageId?: Id<"_storage">;
+      }> = [];
 
-    // If no active chat, create a new one and send message
-    if (!chatId) {
-      const newChatId = await createChatAndSend(userMessage);
-      if (newChatId && sessionId) {
-        // Associate the new chat with the current session
-        setSessionThreads((prev) => ({
-          ...prev,
-          [sessionId]: newChatId,
-        }));
+      if (files.length > 0) {
+        attachments = await uploadFiles(files);
       }
-    } else {
-      // Use existing chat
-      await sendMessage(userMessage);
+
+      if (!userMessage && attachments.length > 0) {
+        userMessage = "Uploaded files";
+      }
+
+      setInputValue("");
+      setDisplayValue("");
+      clearFiles();
+
+      // If no active chat, create a new one and send message
+      if (!chatId) {
+        const newChatId = await createChatAndSend(userMessage, attachments);
+        if (newChatId && sessionId) {
+          // Associate the new chat with the current session
+          setSessionThreads((prev) => ({
+            ...prev,
+            [sessionId]: newChatId,
+          }));
+        }
+      } else {
+        // Use existing chat
+        await sendMessage(userMessage, undefined, attachments);
+      }
+    } catch (error) {
+      console.error("Failed to send message with attachments", error);
     }
   }, [
     inputValue,
+    files,
     isStreaming,
     chatId,
     sessionId,
@@ -164,6 +250,8 @@ export function SimpleChatPanel({
     handleMacroSelect,
     documentContent,
     setSessionThreads,
+    uploadFiles,
+    clearFiles,
   ]);
 
   // Initialize chatId from session on mount and handle expiry
@@ -267,8 +355,8 @@ export function SimpleChatPanel({
           onModelChange={setSelectedModel}
           reasoningEffort={reasoningEffort}
           onReasoningEffortChange={setReasoningEffort}
-          files={[]}
-          onFilesChange={() => {}}
+          files={files}
+          onFilesChange={setFiles}
           webSearch={webSearch}
           onWebSearchChange={setWebSearch}
           onOpenThinkingSidebar={handleOpenThinkingSidebar}

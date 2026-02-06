@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import dynamic from "next/dynamic";
 import {
   Play,
@@ -15,9 +16,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import MarkdownPreview from "@/components/editor/MarkdownPreview";
+import LaTeXPreview from "@/components/latex/LaTeXPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { debounce } from "@/lib/utils";
+import type { MarkdownEditorHandle } from "@/components/editor/MarkdownEditor";
 
 const CodeMirrorEditor = dynamic(
   () => import("@/components/editor/MarkdownEditor"),
@@ -27,7 +30,7 @@ const CodeMirrorEditor = dynamic(
   }
 );
 
-type SlideSyntax = "slidev" | "typst";
+type SlideSyntax = "slidev" | "typst" | "latex";
 type SlideViewMode = "editor" | "split" | "preview";
 
 interface Slide {
@@ -83,7 +86,8 @@ function getStoredDeck(): {
 
     const slides = (parsed.slides as Array<Record<string, unknown>>)
       .map((s) => {
-        const syntax = s.syntax === "typst" ? "typst" : "slidev";
+        const syntax =
+          s.syntax === "typst" || s.syntax === "latex" ? s.syntax : "slidev";
         const source = typeof s.source === "string" ? s.source : "";
         const id =
           typeof s.id === "string"
@@ -116,7 +120,11 @@ function getStoredDeck(): {
 function extractSlideLabel(slide: Slide): string {
   const src = slide.source.trim();
   if (!src)
-    return slide.syntax === "typst" ? "(empty Typst)" : "(empty Slidev)";
+    return slide.syntax === "typst"
+      ? "(empty Typst)"
+      : slide.syntax === "latex"
+        ? "(empty LaTeX)"
+        : "(empty Slidev)";
 
   const heading = src.match(/^#\s+(.+)$/m);
   if (heading?.[1]) return heading[1].trim();
@@ -137,6 +145,7 @@ export default function SlidesPage() {
   const [viewMode, setViewMode] = useState<SlideViewMode>(
     () => stored?.viewMode ?? "split"
   );
+  const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const debouncedSaveRef = useRef<(DeckSave & { cancel: () => void }) | null>(
     null
   );
@@ -224,6 +233,22 @@ export default function SlidesPage() {
       setCurrentSlideIndex(currentSlideIndex - 1);
     }
   };
+
+  const handlePreviewClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const percent =
+        rect.height > 0
+          ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+          : 0;
+      const totalLines = currentSlide.source.split("\n").length;
+      const targetLine = Math.max(1, Math.round(percent * (totalLines - 1)) + 1);
+      editor.scrollToLine(targetLine);
+    },
+    [currentSlide.source]
+  );
 
   return (
     <div className="h-screen flex flex-col bg-zinc-950">
@@ -337,9 +362,11 @@ export default function SlidesPage() {
                 }
               >
                 <CodeMirrorEditor
+                  ref={editorRef}
                   key={currentSlide.id}
                   initialValue={currentSlide.source}
                   onChange={updateCurrentSlideSource}
+                  mode={currentSlide.syntax === "latex" ? "latex" : "markdown"}
                 />
               </div>
             )}
@@ -357,13 +384,22 @@ export default function SlidesPage() {
                   >
                     {currentSlide.syntax === "slidev" ? (
                       <div className="h-full w-full overflow-hidden">
-                        <MarkdownPreview
-                          content={currentSlide.source}
-                          className="h-full w-full"
-                        />
+                        <div className="h-full w-full" onClick={handlePreviewClick}>
+                          <MarkdownPreview
+                            content={currentSlide.source}
+                            className="h-full w-full"
+                          />
+                        </div>
+                      </div>
+                    ) : currentSlide.syntax === "latex" ? (
+                      <div
+                        className="h-full w-full overflow-auto p-6"
+                        onClick={handlePreviewClick}
+                      >
+                        <LaTeXPreview content={currentSlide.source} />
                       </div>
                     ) : (
-                      <div className="h-full w-full overflow-auto p-6">
+                      <div className="h-full w-full overflow-auto p-6" onClick={handlePreviewClick}>
                         <div className="text-sm text-zinc-400 mb-3">
                           Typst preview isn&apos;t supported yet. You can edit
                           Typst source on the left.
@@ -444,6 +480,15 @@ export default function SlidesPage() {
                 >
                   Typst
                 </Button>
+                <Button
+                  variant={
+                    currentSlide.syntax === "latex" ? "secondary" : "outline"
+                  }
+                  onClick={() => updateCurrentSlide({ syntax: "latex" })}
+                  className="w-full col-span-2"
+                >
+                  LaTeX (Beamer)
+                </Button>
               </div>
             </div>
             <div>
@@ -451,7 +496,7 @@ export default function SlidesPage() {
               <div className="text-xs text-zinc-500 space-y-2">
                 <div>Slides are separated by the list on the left.</div>
                 <div>
-                  For now we support only Slidev markdown and Typst source.
+                  For now we support Slidev markdown, Typst, and LaTeX (Beamer).
                 </div>
               </div>
             </div>

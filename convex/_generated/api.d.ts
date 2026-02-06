@@ -14,6 +14,7 @@ import type * as chatThread from "../chatThread.js";
 import type * as chats from "../chats.js";
 import type * as comments from "../comments.js";
 import type * as documents from "../documents.js";
+import type * as fileUploads from "../fileUploads.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
 import type * as utils from "../utils.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   comments: typeof comments;
   documents: typeof documents;
+  fileUploads: typeof fileUploads;
   http: typeof http;
   messages: typeof messages;
   utils: typeof utils;
